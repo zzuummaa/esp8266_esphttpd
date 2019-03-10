@@ -34,10 +34,13 @@ some pictures of cats.
 #include <semphr.h>
 #include <queue.h>
 #include <esp/uart.h>
+#include <rboot-ota/rboot-api.h>
 
 #include "io.h"
 #include "cgi.h"
 #include "cgi-test.h"
+
+#include "http_ota_task.h"
 
 #define AP_SSID "esp-open-rtos AP"
 #define AP_PSK "esp-open-rtos"
@@ -201,13 +204,14 @@ void user_init(void) {
     ioInit();
     captdnsInit();
 
+    printf("FIRMWARE_VERSION : %s\r\n", FIRMWARE_VERSION);
+
     EspFsInitResult fsInitResult = espFsInit((void*)(_binary_build_web_espfs_bin_start));
     char* fsInitStrings[] = {"OK", "NO_IMAGE", "BAD_ALIGN"};
-    printf("espFsInit (adr 0x%x) : %s\n", (uint)_binary_build_web_espfs_bin_start, fsInitStrings[fsInitResult]);
+    printf("espFsInit (adr 0x%x) : %s\r\n", (uint)_binary_build_web_espfs_bin_start, fsInitStrings[fsInitResult]);
 
     httpdInit(builtInUrls, 80);
+    httpOTATaskInit();
 
     xTaskCreate(websocketBcast, "wsbcast", 384, NULL, 3, NULL);
-
-    printf("\nReady\n");
 }

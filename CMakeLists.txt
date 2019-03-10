@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 project(esphttp_test)
 
 set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_VERBOSE_MAKEFILE 1)
+set(CMAKE_VERBOSE_MAKEFILE 0)
 
 # Flash size in megabits
 # Valid values are same as for esptool.py - 512KB, 1MB, 2Mb, 4Mb, 8MB
@@ -22,8 +22,9 @@ set(ESPPORT /dev/ttyUSB0)
 #
 # NB: Setting the value to 0 requires a recent esptool.py (Feb 2016 / commit ebf02c9)
 set(PRINTF_SCANF_FLOAT_SUPPORT,0)
+set(FIRMWARE_VERSION 0.0.6)
 
-SET(USER_DEFFINITIONS -DFLASH_SIZE=4 -DLIBESPHTTPD_OTA_TAGNAME=\"generic\")
+SET(USER_DEFFINITIONS -DFLASH_SIZE=2 -DLIBESPHTTPD_OTA_TAGNAME=\"generic\" -DFIRMWARE_VERSION=\"${FIRMWARE_VERSION}\")
 SET(COMMON_FLAGS -mlongcalls -mtext-section-literals -DGITSHORTREV=\"d0373af\" -ffunction-sections -fdata-sections -Wall -Wl,-EL -DLWIP_MDNS_RESPONDER=1 -DLWIP_NUM_NETIF_CLIENT_DATA=1 -DLWIP_NETIF_EXT_STATUS_CALLBACK=1 ${USER_DEFFINITIONS})
 
 SET(CMAKE_CXX_FLAGS "-std=c++11")
@@ -41,12 +42,14 @@ set(OPEN_ESPLISBS ${ESP_OPEN_RTOS_DIR}/open_esplibs)
 # TODO build rboot OTA lib from rboot OTA dir
 set(RBOOT_OTA_DIR ${ESP_OPEN_RTOS_DIR}/extras/rboot-ota)
 set(RBOOT_OTA_SOURCES ${RBOOT_OTA_DIR}/rboot-api.c ${RBOOT_OTA_DIR}/ota-tftp.c)
-set(PROGRAM_SRC mainUser.c cgi.c cgi.h cgi-test.c cgi-test.h io.c io.h ${RBOOT_OTA_SOURCES})
+set(PROGRAM_SRC mainUser.c cgi.c cgi.h cgi-test.c cgi-test.h io.c io.h ${RBOOT_OTA_SOURCES} http_ota_task.h http_ota_task.c)
 
 add_subdirectory(dhcpserver)
 add_subdirectory(rboot)
 #add_subdirectory(rboot_ota)
 add_subdirectory(libesphttpd)
+add_subdirectory(http_client_ota)
+add_subdirectory(mbedtls)
 
 SET(LIB_MAIN_SOURCES
         ${ESP_OPEN_RTOS_DIR}/open_esplibs/libmain/user_interface.c
@@ -302,6 +305,7 @@ add_dependencies(esphttp_test rename)
 add_dependencies(esphttp_test fs_image)
 add_dependencies(createImage esphttp_test)
 add_dependencies(flash createImage)
+add_dependencies(gen_OTA_server_content createImage)
 
 
 SET(CMAKE_EXE_LINKER_FLAGS "-Wl,--no-check-sections -u call_user_start -Wl,-static -Wl,-Map=./esphttp_test.map -Wl,-gc-sections -T${ESP_OPEN_RTOS_DIR}/ld/program.ld -T${ESP_OPEN_RTOS_DIR}/ld/rom.ld")
@@ -327,6 +331,7 @@ target_link_libraries(esphttp_test
         freeRTOS
         lwip
         dhcpserver libesphttpd
+        http_client_ota mbedtls
 
         ${CMAKE_CURRENT_BINARY_DIR}/sdklib/libmain.a
         ${CMAKE_CURRENT_BINARY_DIR}/sdklib/libnet80211.a
@@ -501,6 +506,10 @@ target_include_directories(program PUBLIC
         ${LWIP_DIR}/include/lwip
         ${ESP_OPEN_RTOS_DIR}/core/include
         ${ESP_OPEN_RTOS_DIR}/open_esplibs/include
+        ${ESP_OPEN_RTOS_DIR}/extras/http_client_ota
+        ${ESP_OPEN_RTOS_DIR}/extras/http_client_ota/include
+        ${ESP_OPEN_RTOS_DIR}/extras/dhcpserver
+        ${ESP_OPEN_RTOS_DIR}/extras/dhcpserver/include
         )
 
 target_compile_options(esphttp_test PRIVATE "${COMMON_FLAGS}")
