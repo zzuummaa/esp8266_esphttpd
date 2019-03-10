@@ -22,6 +22,7 @@
 #include "http_client_ota.h"
 #include "ssid_config.h"
 #define MODULE "HTTP-OTA"
+#define DEBUG
 
 #if defined(DEBUG)
 # ifndef MODULE
@@ -116,7 +117,7 @@ static inline void ota_error_handling(OTA_err err) {
 bool http_get_task(const char* req, char* resp, size_t resp_size, char** pBody)
 {
     *pBody = NULL;
-    DEBUG_PRINT("HTTP get task starting...\r\n");
+    DEBUG_PRINT("HTTP get task starting...");
 
     const struct addrinfo hints = {
             .ai_family = AF_UNSPEC,
@@ -124,11 +125,11 @@ bool http_get_task(const char* req, char* resp, size_t resp_size, char** pBody)
     };
     struct addrinfo *res;
 
-    DEBUG_PRINT("Running DNS lookup for %s...\r\n", SERVER);
+    DEBUG_PRINT("Running DNS lookup for %s...", SERVER);
     int err = getaddrinfo(SERVER, PORT, &hints, &res);
 
     if (err != 0 || res == NULL) {
-        DEBUG_PRINT("DNS lookup failed err=%d res=%p\r\n", err, res);
+        DEBUG_PRINT("DNS lookup failed err=%d res=%p", err, res);
         if(res)
             freeaddrinfo(res);
         return false;
@@ -148,7 +149,7 @@ bool http_get_task(const char* req, char* resp, size_t resp_size, char** pBody)
 
     struct sockaddr *sa = res->ai_addr;
     if (sa->sa_family == AF_INET) {
-        DEBUG_PRINT("DNS lookup succeeded. IP=%s\r\n", inet_ntoa(((struct sockaddr_in *)sa)->sin_addr));
+        DEBUG_PRINT("DNS lookup succeeded. IP=%s", inet_ntoa(((struct sockaddr_in *)sa)->sin_addr));
     }
 #if LWIP_IPV6
     if (sa->sa_family == AF_INET6) {
@@ -158,29 +159,30 @@ bool http_get_task(const char* req, char* resp, size_t resp_size, char** pBody)
 
     int s = socket(res->ai_family, res->ai_socktype, 0);
     if(s < 0) {
-        DEBUG_PRINT("... Failed to allocate socket.\r\n");
+        DEBUG_PRINT("... Failed to allocate socket.");
         freeaddrinfo(res);
         return false;
     }
 
-    DEBUG_PRINT("... allocated socket\r\n");
+    DEBUG_PRINT("... allocated socket");
 
     if(connect(s, res->ai_addr, res->ai_addrlen) != 0) {
         close(s);
         freeaddrinfo(res);
-        DEBUG_PRINT("... socket connect failed.\r\n");
+        DEBUG_PRINT("... socket connect failed.");
         return false;
     }
 
-    DEBUG_PRINT("... connected\r\n");
+    DEBUG_PRINT("... connected");
     freeaddrinfo(res);
 
     if (write(s, req, strlen(req)) < 0) {
-        DEBUG_PRINT("... socket send failed\r\n");
+        DEBUG_PRINT("... socket send failed");
         close(s);
         return false;
     }
-    DEBUG_PRINT("... socket send success\r\n");
+    DEBUG_PRINT("... socket send success");
+    DEBUG_PRINT("\r\n---->");
 
     int r;
     char* pos;
@@ -200,7 +202,9 @@ bool http_get_task(const char* req, char* resp, size_t resp_size, char** pBody)
         }
 
         if(r > 0) {
-            DEBUG_PRINT("%s", resp);
+#ifdef DEBUG
+        printf("%s", resp);
+#endif
         }
         resp += r;
         resp_size -= r;
@@ -208,13 +212,22 @@ bool http_get_task(const char* req, char* resp, size_t resp_size, char** pBody)
 
     close(s);
 
+#ifdef DEBUG
+    printf("<----\r\n");
+#endif
+
     if (resp_size == 0) {
-        DEBUG_PRINT("\r\n... response buffer overflowed.\r\n");
+        DEBUG_PRINT("... response buffer overflowed.");
         return false;
-    } else {
-        DEBUG_PRINT("\r\n... done reading from socket. Last read return=%d errno=%d\r\n", r, errno);
-        return true;
     }
+
+    if (*pBody == NULL) {
+        DEBUG_PRINT("... resp body not found.");
+        return false;
+    }
+
+    DEBUG_PRINT("... done reading from socket. Last read return=%d errno=%d", r, errno);
+    return true;
 }
 
 static void scanVersion(const char* strVer, firmware_version* fv) {
@@ -252,21 +265,23 @@ static void ota_task(void *PvParameter)
     while (1) {
         // Get version of OTA update
         if (!http_get_task(req, resp, sizeof(resp), &pBody)) {
-            vTaskDelayMs(4000);
+            DEBUG_PRINT("\r\n");
+            vTaskDelayMs(6000);
             continue;
         }
 
-        DEBUG_PRINT("Response body:\r\n%s\r\n", pBody);
+        DEBUG_PRINT("Response body:\r\n---->%s<----", pBody);
 
         firmware_version newFv;
         scanVersion(pBody, &newFv);
-        DEBUG_PRINT("new firmware version: %d.%d.%d\r\n", newFv.version[2], newFv.version[1], newFv.version[0]);
+        DEBUG_PRINT("new firmware version: %d.%d.%d", newFv.version[2], newFv.version[1], newFv.version[0]);
 
         if (memcmp(&newFv, &curFv, sizeof(firmware_version)) <= 0) {
-            vTaskDelayMs(4000);
+            DEBUG_PRINT("\r\n");
+            vTaskDelayMs(6000);
             continue;
         }
-        printf("updating firmware to %d.%d.%d\r\n", newFv.version[2], newFv.version[1], newFv.version[0]);
+        printf("updating firmware to %d.%d.%d", newFv.version[2], newFv.version[1], newFv.version[0]);
 
         OTA_err err;
         // Remake this task until ota work
@@ -281,13 +296,13 @@ static void ota_task(void *PvParameter)
         }
 
         vTaskDelayMs(1000);
-        printf("Delay 1\n");
+        printf("Delay 1,");
         vTaskDelayMs(1000);
-        printf("Delay 2\n");
+        printf("2,");
         vTaskDelayMs(1000);
-        printf("Delay 3\n");
+        printf("3\r\n");
 
-        printf("Reset\n");
+        printf("Reset\r\n");
         sdk_system_restart();
     }
 }

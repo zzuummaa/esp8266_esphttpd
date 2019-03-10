@@ -9,7 +9,7 @@ else
     FIRMWARE_VERSION=$(sed 's/;/./g' $CACHE_FILE)
 fi
 
-#echo "FIRMWARE_VERSION: $FIRMWARE_VERSION"
+echo "FIRMWARE_VERSION: $FIRMWARE_VERSION"
 
 if [ -z "$PROJECT_NAME" ]
 then
