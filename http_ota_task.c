@@ -223,7 +223,7 @@ static void scanVersion(const char* strVer, firmware_version* fv) {
     int i = 2;
     while (*p != '\0') {
         end = strstr(p, ".");
-        fv->version[i--] = (char) atoi(p);
+        fv->version[i--] = (uint8_t) atoi(p);
 
         if (end == NULL || i == -1) return;
         p = end + 1;
@@ -266,6 +266,7 @@ static void ota_task(void *PvParameter)
             vTaskDelayMs(4000);
             continue;
         }
+        printf("updating firmware to %d.%d.%d\r\n", newFv.version[2], newFv.version[1], newFv.version[0]);
 
         OTA_err err;
         // Remake this task until ota work

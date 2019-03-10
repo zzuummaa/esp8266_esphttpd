@@ -7,8 +7,11 @@
 
 //#define FIRMWARE_VERSION "0.0.1"
 
+#include <stdint.h>
+#include "firmware_version.h"
+
 typedef struct firmware_version_t {
-    char version[3];
+    uint8_t version[3];
 } firmware_version;
 
 void httpOTATaskInit(void);

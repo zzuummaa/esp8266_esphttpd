@@ -22,9 +22,8 @@ set(ESPPORT /dev/ttyUSB0)
 #
 # NB: Setting the value to 0 requires a recent esptool.py (Feb 2016 / commit ebf02c9)
 set(PRINTF_SCANF_FLOAT_SUPPORT,0)
-set(FIRMWARE_VERSION 0.0.6)
 
-SET(USER_DEFFINITIONS -DFLASH_SIZE=2 -DLIBESPHTTPD_OTA_TAGNAME=\"generic\" -DFIRMWARE_VERSION=\"${FIRMWARE_VERSION}\")
+SET(USER_DEFFINITIONS -DFLASH_SIZE=2 -DLIBESPHTTPD_OTA_TAGNAME=\"generic\")
 SET(COMMON_FLAGS -mlongcalls -mtext-section-literals -DGITSHORTREV=\"d0373af\" -ffunction-sections -fdata-sections -Wall -Wl,-EL -DLWIP_MDNS_RESPONDER=1 -DLWIP_NUM_NETIF_CLIENT_DATA=1 -DLWIP_NETIF_EXT_STATUS_CALLBACK=1 ${USER_DEFFINITIONS})
 
 SET(CMAKE_CXX_FLAGS "-std=c++11")
@@ -297,7 +296,6 @@ add_custom_command(TARGET flash
         0x0 ${BOOT_FIRMWARE}
         0x1000 ${ESP_OPEN_RTOS_DIR}/bootloader/firmware_prebuilt/blank_config.bin
         0x2000 esphttp_test.bin
-
         )
 
 add_dependencies(rename remove)
@@ -305,7 +303,6 @@ add_dependencies(esphttp_test rename)
 add_dependencies(esphttp_test fs_image)
 add_dependencies(createImage esphttp_test)
 add_dependencies(flash createImage)
-add_dependencies(gen_OTA_server_content createImage)
 
 
 SET(CMAKE_EXE_LINKER_FLAGS "-Wl,--no-check-sections -u call_user_start -Wl,-static -Wl,-Map=./esphttp_test.map -Wl,-gc-sections -T${ESP_OPEN_RTOS_DIR}/ld/program.ld -T${ESP_OPEN_RTOS_DIR}/ld/rom.ld")
@@ -492,6 +489,7 @@ target_link_libraries(program dhcpserver libesphttpd)
 
 target_include_directories(program PUBLIC
         ./
+        ${PROJECT_BINARY_DIR}
         ./include
         ${ESP_OPEN_RTOS_DIR}/extras
         ${ESP_OPEN_RTOS_DIR}/include
@@ -532,3 +530,31 @@ target_include_directories(esphttp_test PUBLIC
         ${ESP_OPEN_RTOS_DIR}/open_esplibs/include
         ${ESP_OPEN_RTOS_DIR}/extras/rboot-ota
         )
+
+#Get master directory
+get_filename_component(MASTER_DIR ${CMAKE_SOURCE_DIR} DIRECTORY)
+get_filename_component(MASTER_DIR ${MASTER_DIR} DIRECTORY)
+
+#Script for version update
+add_custom_target(inc_version
+        COMMAND ${CMAKE_COMMAND}
+        -DHEADER_DIR:PATH="${CMAKE_BINARY_DIR}"
+        -DCACHE_DIR:PATH="${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}"
+        -DLANGUAGE:STRING="C"
+        -P "../build_number.cmake"
+        COMMENT "Increment firmware version"
+)
+
+add_dependencies(program inc_version)
+
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/CreateImage.sh
+     DESTINATION ${CMAKE_CURRENT_BINARY_DIR}
+     FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+)
+
+add_custom_command(
+        TARGET createImage
+        POST_BUILD
+        COMMAND
+        COMMAND export PROJECT_NAME=${PROJECT_NAME} && ./CreateImage.sh
+        COMMENT "Generate OTA server content")

@@ -30,11 +30,3 @@ target_include_directories(http_client_ota PUBLIC
             ${ESP_OPEN_RTOS_DIR}/bootloader/rboot
             ${ESP_OPEN_RTOS_DIR}/extras/rboot-ota
             )
-
-add_custom_target(gen_OTA_server_content
-        COMMAND rm ../test_file/*
-        COMMAND mkdir -p ../test_file
-        COMMAND sha256sum ../${PROJECT_NAME}.bin | cut -d ' ' -f1 > ../test_file/firmware.sha256
-        COMMAND cp ../${PROJECT_NAME}.bin ../test_file/firmware.bin
-        COMMAND echo ${FIRMWARE_VERSION} > ../test_file/version
-        COMMENT "Generate OTA server content")
